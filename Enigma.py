@@ -2,6 +2,8 @@ import numpy as np
 import re
 from collections.abc import Iterable
 
+# TODO: is it worth trying to make helper a decorator?
+
 HISTORICAL_ROTORS = {   'I':    ('EKMFLGDQVZNTOWYHXUSPAIBRCJ','Q'), 
                         'II':   ('AJDKSIRUXBLHWTMCQGZNPYFVOE','E'),
                         'III':  ('BDFHJLCPRTXVZNYEIWGAKMUSQO','V'),
@@ -20,9 +22,15 @@ HISTORICAL_ROTORS = {   'I':    ('EKMFLGDQVZNTOWYHXUSPAIBRCJ','Q'),
 def helper(x):
     assert isinstance(x, str)
     assert len(x) == 1
-    x = x.lower()
-    x = ord(x) - 97
 
+    x = x.lower()
+
+    # magic 97 from text encoding
+    x = ord(x) - 97 
+
+    # only allow alpha characters
+    # serves to check text encoding
+    # as well as alpha
     assert x >= 0 and x <=25
 
     return x
@@ -32,9 +40,9 @@ class Rotor(object):
         if cipher is None:
             self.map = np.random.choice(range(26), 26, replace=False)
         else:
-            self.setMap(cipher)
+            self.set_map(cipher)
 
-        self.setNotches(notches)
+        self.set_notches(notches)
         
         self.step = step
 
@@ -63,17 +71,18 @@ class Rotor(object):
             for i in range(len(self.notches)):
                 self.notches[i] = (self.notches[i] - 1) % 26
 
-    def setMap(self, charList):
+    def set_map(self, charList):
         if isinstance(charList, str):
             assert len(charList) == 26
             charList = [helper(c) for c in charList]
             self.map = np.array(charList)
 
+        # TODO: what is this checking for?
         elif isinstance(charList, Iterable):
             assert np.array_equal(sorted(charList), np.array(range(26)))
             self.map = np.array(charList)
     
-    def setNotches(self, inds):
+    def set_notches(self, inds):
         if isinstance(inds, str):
             self.notches = [helper(c) for c in inds]
         elif not inds is None:
@@ -85,7 +94,7 @@ class Rotor(object):
         else:
             raise Exception("invalid notches config")
 
-    def setIndex(self, ind):
+    def set_index(self, ind):
         if ind < 0 or ind > 25:
             raise Exception("invalid index")
 
@@ -103,7 +112,7 @@ class Rotor(object):
         self.map = np.array([(c-self.ring)%26 for c in self.map], dtype=int)
         self.ring = 0
 
-    def getKey(self):
+    def get_key(self):
         ind = chr(self.index + 97)
         notches = ''.join([chr(c + 97) for c in self.notches])
 
@@ -124,7 +133,7 @@ class Reflector(Rotor):
         
         self.step = step
 
-    def getKey(self):
+    def get_key(self):
         return chr(self.index + 97)
 
 class EntryRotor(Rotor):
@@ -132,7 +141,7 @@ class EntryRotor(Rotor):
     def __init__(self, step=False):
         super().__init__(step=step)
 
-    def encodeLetter(self, value):
+    def encode_letter(self, value):
         if not isinstance(value, str) \
             or not value.isalpha() \
             or len(value) > 1:
@@ -141,16 +150,16 @@ class EntryRotor(Rotor):
         value = ord(value) - 97
         return super().encode(value)
 
-    def decodeLetter(self, value):
+    def decode_letter(self, value):
         # super decode takes care of checking valid value
         value = super().decode(value)
         return chr(value+97) # move to appropriate ASCII range
 
 class Plugboard(object):
     def __init__(self, connections=1):
-        self.setPlugs(connections)
+        self.set_plugs(connections)
 
-    def encodeLetter(self, value):
+    def encode_letter(self, value):
         if not isinstance(value, str) \
             or not value.isalpha() \
             or len(value) > 1:
@@ -163,14 +172,14 @@ class Plugboard(object):
         
         return self.map[value]
 
-    def decodeLetter(self, value):
+    def decode_letter(self, value):
         if value < 0 or value > 25:
             raise Exception("invalid character")
 
         value = self.map[value]
         return chr(value+97)
 
-    def setPlugs(self, connections):
+    def set_plugs(self, connections):
         self.map = list(range(26))
 
         if isinstance(connections, str):
@@ -226,11 +235,11 @@ class Machine(object):
 
         self.allowedChars = re.compile('[^a-z]')
 
-        self.key = ' '.join([r.getKey() for r in self.rotors])
+        self.key = ' '.join([r.get_key() for r in self.rotors])
 
-        self.refPos = self.reflector.getKey()
+        self.refPos = self.reflector.get_key()
 
-    def advanceRotors(self):
+    def advance_rotors(self):
         step = [0]*(self.rotorCount+1)
 
         notches = []
@@ -256,11 +265,11 @@ class Machine(object):
         if step[-1]:
             self.reflector.turnover()
 
-    def encodeString(self, string, key=None):
+    def encode_string(self, string, key=None):
         if not key is None:
-            self.configureMachine(key)
+            self.configure_machine(key)
         else:
-            self.configureMachine(self.key)
+            self.configure_machine(self.key)
 
         # clean up input, just in case
         string = string.lower()
@@ -268,11 +277,12 @@ class Machine(object):
 
         out = ''
         for c in string:
-            self.advanceRotors()
+            # TODO: advance rotors could decorate encode
+            self.advance_rotors()
 
             val = c
             
-            val = self.plugboard.encodeLetter(val)
+            val = self.plugboard.encode_letter(val)
 
             val = self.entry.encode(val)
             for r in reversed(self.rotors):
@@ -285,13 +295,13 @@ class Machine(object):
             
             val = self.entry.decode(val)
 
-            val = self.plugboard.decodeLetter(val)
+            val = self.plugboard.decode_letter(val)
 
             out += val
 
         return out
     
-    def configureMachine(self, key=None, ring=None, refPos=None):
+    def configure_machine(self, key=None, ring=None, refPos=None):
         # key: <rotor ind><notch positions> <>...
 
         if not key is None:
@@ -300,7 +310,7 @@ class Machine(object):
                 raise Exception("invalid key")
 
             for i, c in enumerate(key):
-                self.rotors[i].setIndex(helper(c))
+                self.rotors[i].set_index(helper(c))
                 self.key = key
         
         if not ring is None:
@@ -312,21 +322,21 @@ class Machine(object):
                 self.rotors[i].setRing(helper(c))
 
         if not refPos is None:  
-            self.reflector.setIndex(helper(refPos))
+            self.reflector.set_index(helper(refPos))
             self.refPos = refPos
 
-    def setRotor(self, num, cipher, step=True):
+    def set_rotor(self, num, cipher, step=True):
         if num > self.rotorCount:
             raise Exception("invalid rotor")
         
-        self.rotors[num-1].setMap(cipher)
+        self.rotors[num-1].set_map(cipher)
         self.rotors[num-1].step = step
     
-    def setPlugs(self, plugs):
-        self.plugboard.setPlugs(plugs)
+    def set_plugs(self, plugs):
+        self.plugboard.set_plugs(plugs)
 
     def reset(self):
-        self.configureMachine(self.key, self.refPos)
+        self.configure_machine(self.key, self.refPos)
 
 if __name__ == '__main__':
     enigma = Machine(rotorCount=4)
@@ -335,8 +345,8 @@ if __name__ == '__main__':
     key = 'akio'
 
     s = input("type what you would like to encode: ")
-    coded = enigma.encodeString(s, key=key)
-    decoded = enigma.encodeString(coded, key=key)
+    coded = enigma.encode_string(s, key=key)
+    decoded = enigma.encode_string(coded, key=key)
 
     print()
     print("###### Message ######")
@@ -361,18 +371,18 @@ if __name__ == '__main__':
     rotors = [Rotor(*r) for r in rotors]
     reflector = HISTORICAL_ROTORS['BT']
 
-    enigma.reflector.setMap(reflector[0])
+    enigma.reflector.set_map(reflector[0])
     enigma.key = key
-    enigma.setPlugs(plugs)
-    enigma.entry.setMap(range(26))
+    enigma.set_plugs(plugs)
+    enigma.entry.set_map(range(26))
 
     enigma.rotors = rotors
     enigma.rotors[0].step = False
-    enigma.configureMachine(ring=ring)
+    enigma.configure_machine(ring=ring)
 
     message = 'HCEYZTCSOPUPPZDICQRDLWXXFACTTJMBRDVCJJMMZRPYIKHZAWGLYXWTMJPQUEFSZBOTVRLALZXWVXTSLFFFAUDQFBWRRYAPSBOWJMKLDUYUPFUQDOWVHAHCDWAUARSWTKOFVOYFPUFHVZFDGGPOOVGRMBPXXZCANKMONFHXPCKHJZBUMXJWXKAUODXZUCVCXPFT'
 
-    dec = enigma.encodeString(message, key)
+    dec = enigma.encode_string(message, key)
     actual  ='BOOTKLARXBEIJSCHNOORBETWAZWOSIBENXNOVXSECHSNULCBMXPROVIANTBISZWONULXDEZXBENOETIGEGLMESERYNOCHVIEFKLHRXSTEHEMARQUBRUNOBRUNFZWOFUHFXLAGWWIEJKCHAEFERJXNNTWWWFUNFYEINSFUNFMBSTEIGENDYGUTESIWXDVVVJRASCH'.lower()
 
     assert dec == actual
@@ -385,12 +395,12 @@ if __name__ == '__main__':
     rotors = [Rotor(*r) for r in rotors]
     reflector = HISTORICAL_ROTORS['B']
 
-    enigma.reflector.setMap(reflector[0])
+    enigma.reflector.set_map(reflector[0])
     enigma.key = key
-    enigma.setPlugs(0)
-    enigma.entry.setMap(range(26))
+    enigma.set_plugs(0)
+    enigma.entry.set_map(range(26))
 
     enigma.rotors = rotors
-    enigma.configureMachine(ring=ring)
-    print(enigma.encodeString('AAAAA', key))
+    enigma.configure_machine(ring=ring)
+    print(enigma.encode_string('AAAAA', key))
     '''
