@@ -2,24 +2,24 @@ import numpy as np
 import re
 from collections.abc import Iterable
 
-# TODO: is it worth trying to make helper a decorator?
+# TODO: is it worth trying to make alpha_ord a decorator?
 
-HISTORICAL_ROTORS = {   'I':    ('EKMFLGDQVZNTOWYHXUSPAIBRCJ','Q'), 
-                        'II':   ('AJDKSIRUXBLHWTMCQGZNPYFVOE','E'),
-                        'III':  ('BDFHJLCPRTXVZNYEIWGAKMUSQO','V'),
-                        'IV':   ('ESOVPZJAYQUIRHXLNFTGKDCMWB','J'),
-                        'V':    ('VZBRGITYUPSDNHLXAWMJQOFECK','Z'),
-                        'VI':   ('JPGVOUMFYQBENHZRDKASXLICTW','ZM'),
-                        'VII':  ('NZJHGRCXMYSWBOUFAIVLPEKQDT','ZM'),
-                        'VIII': ('FKQHTLXOCBJSPDZRAMEWNIUYGV','ZM'),
-                        'BETA': ('LEYJVCNIXWPBQMDRTAKZGFUHOS',None),
-                        'GAMMA':('FSOKANUERHMBTIYCWLQPZXVGJD',None),
-                        'A':    ('EJMZALYXVBWFCRQUONTSPIKHGD',None),
-                        'B':    ('YRUHQSLDPXNGOKMIEBFZCWVJAT',None),
-                        'C':    ('FVPJIAOYEDRZXWGCTKUQSBNMHL',None),
-                        'BT': ('ENKQAUYWJICOPBLMDXZVFTHRGS',None)}
+HISTORICAL_ROTORS = {   'I':    ('EKMFLGDQVZNTOWYHXUSPAIBRCJ', 'Q'),
+                        'II':   ('AJDKSIRUXBLHWTMCQGZNPYFVOE', 'E'),
+                        'III':  ('BDFHJLCPRTXVZNYEIWGAKMUSQO', 'V'),
+                        'IV':   ('ESOVPZJAYQUIRHXLNFTGKDCMWB', 'J'),
+                        'V':    ('VZBRGITYUPSDNHLXAWMJQOFECK', 'Z'),
+                        'VI':   ('JPGVOUMFYQBENHZRDKASXLICTW', 'ZM'),
+                        'VII':  ('NZJHGRCXMYSWBOUFAIVLPEKQDT', 'ZM'),
+                        'VIII': ('FKQHTLXOCBJSPDZRAMEWNIUYGV', 'ZM'),
+                        'BETA': ('LEYJVCNIXWPBQMDRTAKZGFUHOS', None),
+                        'GAMMA':('FSOKANUERHMBTIYCWLQPZXVGJD', None),
+                        'A':    ('EJMZALYXVBWFCRQUONTSPIKHGD', None),
+                        'B':    ('YRUHQSLDPXNGOKMIEBFZCWVJAT', None),
+                        'C':    ('FVPJIAOYEDRZXWGCTKUQSBNMHL', None),
+                        'BT':   ('ENKQAUYWJICOPBLMDXZVFTHRGS', None)}
 
-def helper(x):
+def alpha_ord(x):
     assert isinstance(x, str)
     assert len(x) == 1
 
@@ -73,19 +73,16 @@ class Rotor(object):
 
     def set_map(self, charList):
         if isinstance(charList, str):
-            assert len(charList) == 26
-            charList = [helper(c) for c in charList]
-            self.map = np.array(charList)
+            charList = [alpha_ord(c) for c in charList]
 
-        # TODO: what is this checking for?
-        elif isinstance(charList, Iterable):
-            assert np.array_equal(sorted(charList), np.array(range(26)))
-            self.map = np.array(charList)
+        assert np.array_equal(sorted(charList), np.array(range(26)))
+
+        self.map = np.array(charList)
     
     def set_notches(self, inds):
         if isinstance(inds, str):
-            self.notches = [helper(c) for c in inds]
-        elif not inds is None:
+            self.notches = [alpha_ord(c) for c in inds]
+        elif inds is not None:
             if min(inds) < 0 or max(inds) > 25:
                 raise Exception("invalid notch position")
             self.notches = inds
@@ -116,7 +113,7 @@ class Rotor(object):
         ind = chr(self.index + 97)
         notches = ''.join([chr(c + 97) for c in self.notches])
 
-        return ind+notches
+        return ind + notches
 
 class Reflector(Rotor):
     def __init__(self, step=False):
@@ -189,8 +186,8 @@ class Plugboard(object):
             for each in connections:
                 if len(each) != 2:
                     raise Exception("invalid plugboard config")
-                self.map[helper(each[0])] = helper(each[1])
-                self.map[helper(each[1])] = helper(each[0])
+                self.map[alpha_ord(each[0])] = alpha_ord(each[1])
+                self.map[alpha_ord(each[1])] = alpha_ord(each[0])
 
         elif isinstance(connections, Iterable):
             if len(connections) > 13:
@@ -310,7 +307,7 @@ class Machine(object):
                 raise Exception("invalid key")
 
             for i, c in enumerate(key):
-                self.rotors[i].set_index(helper(c))
+                self.rotors[i].set_index(alpha_ord(c))
                 self.key = key
         
         if not ring is None:
@@ -319,10 +316,10 @@ class Machine(object):
                 raise Exception("invalid ring setup")
 
             for i,c in enumerate(ring):
-                self.rotors[i].setRing(helper(c))
+                self.rotors[i].setRing(alpha_ord(c))
 
         if not refPos is None:  
-            self.reflector.set_index(helper(refPos))
+            self.reflector.set_index(alpha_ord(refPos))
             self.refPos = refPos
 
     def set_rotor(self, num, cipher, step=True):
@@ -341,27 +338,7 @@ class Machine(object):
 if __name__ == '__main__':
     enigma = Machine(rotorCount=4)
     
-    '''
-    key = 'akio'
 
-    s = input("type what you would like to encode: ")
-    coded = enigma.encode_string(s, key=key)
-    decoded = enigma.encode_string(coded, key=key)
-
-    print()
-    print("###### Message ######")
-    print(s)
-    print()
-
-    print("###### Coded ######")
-    print(coded)
-    print()
-
-    print("###### Decoded ######")
-    print(decoded)
-    '''
-
-    '''
     # https://enigma.hoerenberg.com/index.php?cat=M4%20Project%202006&page=Rasch%20Message
 
     plugs = 'BQ CR DI EJ KW MT OS PX UZ GH'
@@ -386,21 +363,3 @@ if __name__ == '__main__':
     actual  ='BOOTKLARXBEIJSCHNOORBETWAZWOSIBENXNOVXSECHSNULCBMXPROVIANTBISZWONULXDEZXBENOETIGEGLMESERYNOCHVIEFKLHRXSTEHEMARQUBRUNOBRUNFZWOFUHFXLAGWWIEJKCHAEFERJXNNTWWWFUNFYEINSFUNFMBSTEIGENDYGUTESIWXDVVVJRASCH'.lower()
 
     assert dec == actual
-    '''
-
-    '''
-    ring = 'DDD'
-    key = 'AAA'
-    rotors = [HISTORICAL_ROTORS['I'], HISTORICAL_ROTORS['II'], HISTORICAL_ROTORS['III']]
-    rotors = [Rotor(*r) for r in rotors]
-    reflector = HISTORICAL_ROTORS['B']
-
-    enigma.reflector.set_map(reflector[0])
-    enigma.key = key
-    enigma.set_plugs(0)
-    enigma.entry.set_map(range(26))
-
-    enigma.rotors = rotors
-    enigma.configure_machine(ring=ring)
-    print(enigma.encode_string('AAAAA', key))
-    '''
